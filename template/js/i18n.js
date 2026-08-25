@@ -5,11 +5,17 @@
  *   2. localStorage 'rp_lang'
  *   3. navigator.language(s) browser
  *   4. default 'en'
+ *
+ * Tombol bahasa di header berupa DROPDOWN: klik -> daftar bahasa -> pilih.
  */
 'use strict';
 
 const DEFAULT_LANG = 'en';
-const AVAILABLE_LANGS = ['en', 'id', 'es']; // tambah bahasa baru: buat js/lang/<code>.js + daftar di sini
+// Konfigurasi bahasa tersedia. Tambah bahasa baru:
+//   1. Buat js/lang/<code>.js berisi window.I18N.<code> = { _meta:{native:'...'}, ... }
+//   2. Muat file-nya di index.html (<script src="js/lang/<code>.js"></script>)
+//   3. Daftarkan kode-nya di daftar ini + SHELL di sw.js
+const AVAILABLE_LANGS = ['en', 'id', 'es', 'zh', 'hi', 'ar', 'fr', 'de', 'pt', 'ru', 'ja'];
 
 function pickLang(codes) {
     for (const raw of codes) {
@@ -17,6 +23,11 @@ function pickLang(codes) {
         if (AVAILABLE_LANGS.includes(base)) return base;
     }
     return DEFAULT_LANG;
+}
+
+function langNativeName(code) {
+    const dict = window.I18N && I18N[code];
+    return (dict && dict._meta && dict._meta.native) || code.toUpperCase();
 }
 
 // --- Deteksi bahsa awal: ?lang= > localStorage > browser ---
@@ -71,29 +82,104 @@ function applyLang() {
     document.documentElement.lang = currentLang;
 }
 
-// Ganti bahasa saat runtime + persist. Tidak dipakai tombol toggle lama —
-// taxan di sini agar bisa dipanggil dari picker bahasa.
+// Ganti bahasa saat runtime + persist.
 function setLang(lang) {
     currentLang = pickLang([lang]);
     try { localStorage.setItem('rp_lang', currentLang); } catch (e) { /* ignore */ }
     applyLang();
     updateLangButtonLabel();
+    refreshLangMenuActive();
     if (window.rpApp && rpApp.onLangChange) rpApp.onLangChange();
 }
 
+/* ---------- Dropdown picker bahasa ---------- */
+
 function updateLangButtonLabel() {
+    const label = document.getElementById('lang-current-label');
+    if (label) label.textContent = langNativeName(currentLang);
+}
+
+function refreshLangMenuActive() {
+    const menu = document.getElementById('lang-menu');
+    if (!menu) return;
+    menu.querySelectorAll('.lang-item').forEach(item => {
+        const active = item.dataset.lang === currentLang;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+}
+
+function buildLangMenu() {
+    const menu = document.getElementById('lang-menu');
+    if (!menu) return;
+    menu.innerHTML = '';
+    AVAILABLE_LANGS.forEach(code => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'lang-item' + (code === currentLang ? ' active' : '');
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', code === currentLang ? 'true' : 'false');
+        item.dataset.lang = code;
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'lang-name';
+        nameEl.textContent = langNativeName(code);
+
+        const codeEl = document.createElement('span');
+        codeEl.className = 'lang-code';
+        codeEl.textContent = code.toUpperCase();
+
+        item.append(nameEl, codeEl);
+        item.addEventListener('click', () => {
+            closeLangMenu();
+            setLang(code);
+        });
+        menu.appendChild(item);
+    });
+}
+
+function openLangMenu() {
     const btn = document.getElementById('lang-toggle');
-    if (!btn) return;
-    const next = pickLang([...AVAILABLE_LANGS].filter(l => l !== currentLang));
-    btn.textContent = `${currentLang.toUpperCase()} → ${next.toUpperCase()}`;
+    const menu = document.getElementById('lang-menu');
+    if (!btn || !menu || !menu.classList.contains('hidden')) return;
+    refreshLangMenuActive();
+    menu.classList.remove('hidden');
+    btn.setAttribute('aria-expanded', 'true');
 }
 
-// Tombol header berputar ke bahasa berikutnya.
-function cycleLang() {
-    const others = AVAILABLE_LANGS.filter(l => l !== currentLang);
-    setLang(others.length ? others[0] : DEFAULT_LANG);
+function closeLangMenu() {
+    const btn = document.getElementById('lang-toggle');
+    const menu = document.getElementById('lang-menu');
+    if (!menu || menu.classList.contains('hidden')) return;
+    menu.classList.add('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
-// Label "Bahasa: X" lama sudah tidak ada; switch_lang tidak lagi dibutuhkan,
-// tapi tetap disediakan agar pemanggil lama tidak error.
-const toggleLang = cycleLang;
+function isLangMenuOpen() {
+    const menu = document.getElementById('lang-menu');
+    return !!menu && !menu.classList.contains('hidden');
+}
+
+// Pasang interaksi dropdown: klik tombol buka/tutup, klik luar & Escape menutup.
+function setupLangPicker() {
+    const btn = document.getElementById('lang-toggle');
+    const menu = document.getElementById('lang-menu');
+    if (!btn || !menu) return;
+
+    buildLangMenu();
+    updateLangButtonLabel();
+
+    btn.addEventListener('click', e => {
+        e.stopPropagation();
+        isLangMenuOpen() ? closeLangMenu() : openLangMenu();
+    });
+    document.addEventListener('click', e => {
+        if (isLangMenuOpen() && !e.target.closest('.lang-picker')) closeLangMenu();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && isLangMenuOpen()) {
+            closeLangMenu();
+            btn.focus();
+        }
+    });
+}

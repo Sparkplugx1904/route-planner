@@ -56,6 +56,7 @@ const App = {
     allCoords: null,
     running: false,
     runAbort: false,
+    teamsTouched: false,   // step 3 selesai hanya jika jumlah kendaraan pernah diubah
 };
 
 const $ = id => document.getElementById(id);
@@ -122,6 +123,7 @@ function saveSession() {
             profile: $('profile').value,
             restarts: $('restarts').value,
             roadLines: $('road-lines').checked,
+            teamsTouched: App.teamsTouched,
             lang: currentLang
         }));
     } catch (e) { /* storage penuh/diblokir — abaikan */ }
@@ -144,6 +146,7 @@ function loadSession() {
         if (s.profile) $('profile').value = s.profile;
         if (s.restarts) $('restarts').value = s.restarts;
         if (typeof s.roadLines === 'boolean') $('road-lines').checked = s.roadLines;
+        if (typeof s.teamsTouched === 'boolean') App.teamsTouched = s.teamsTouched;
         if (s.lang && s.lang !== currentLang) {
             currentLang = s.lang;
             localStorage.setItem('rp_lang', s.lang);
@@ -161,6 +164,7 @@ function newSession() {
         $('depot-lat').value = '';
         $('depot-lon').value = '';
         $('teams').value = 1;
+        App.teamsTouched = false;
         try { localStorage.removeItem(SESSION_KEY); } catch (e) { }
         renderPointList();
         refreshMap();
@@ -178,9 +182,6 @@ function setupSession() {
         ['depot-name', 'change'], ['depot-lat', 'change'], ['depot-lon', 'change']
     ];
     fields.forEach(([id, evt]) => $(id).addEventListener(evt, saveSession));
-    const lnk = $('lang-toggle');
-    const orig = lnk.onclick || (() => {});
-    lnk.addEventListener('click', () => setTimeout(saveSession, 0));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -189,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyLang();
     }
     updateLangButtonLabel();
-$('lang-toggle').addEventListener('click', cycleLang);
+    setupLangPicker();
     window.rpApp = window.rpApp || {};
     window.rpApp.onLangChange = () => updateChecklist();
 
@@ -517,6 +518,12 @@ function setupStepper() {
         input.value = v;
         input.dispatchEvent(new Event('change'));
     };
+    // Terdaftar sebelum listener saveSession (setupSession) agar flag
+    // sudah true ketika sesi disimpan pada event change yang sama.
+    input.addEventListener('change', () => {
+        App.teamsTouched = true;
+        updateChecklist();
+    });
     $('teams-minus').addEventListener('click', () => step(-1));
     $('teams-plus').addEventListener('click', () => step(1));
 }
@@ -542,7 +549,7 @@ function updateTeamsSuggest() {
 function updateChecklist() {
     const hasPoints = App.points.length > 0;
     const hasDepot = Number.isFinite(App.depot.lat) && Number.isFinite(App.depot.lon) && !!App.depot.name;
-    const steps = [hasPoints, hasDepot, true];
+    const steps = [hasPoints, hasDepot, App.teamsTouched];
     document.querySelectorAll('#steps .step').forEach((el, i) => {
         el.classList.toggle('done', steps[i]);
     });

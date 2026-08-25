@@ -5,25 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Route Planner</title>
     <meta name="description" content="Bagikan titik pengiriman ke beberapa kendaraan dengan beban kerja seimbang.">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230F766E'/><g fill='none' stroke='%23FFFFFF' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'><rect x='17' y='28' width='46' height='36' rx='4'/><path d='M63 42h13l11 11v11H63z'/><circle cx='35' cy='72' r='5' fill='%23FFFFFF' stroke='none'/><circle cx='71' cy='72' r='5' fill='%23FFFFFF' stroke='none'/></g></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23F7F4ED'/><path d='M15 70h70M25 70V40h20l12 14v16M57 54h18l10 10v6' fill='none' stroke='%23BC642E' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/><circle cx='35' cy='74' r='5' fill='%23E8935A'/><circle cx='75' cy='74' r='5' fill='%23149A73'/></svg>">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0F172A">
+    <meta name="theme-color" content="#F7F4ED">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div id="offline-banner" class="offline-banner hidden"></div>
+
     <header class="app-header">
         <div class="brand">
             <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#icon-truck"/></svg></span>
-            <h1>Route Planner</h1>
+            <div class="brand-text">
+                <h1>Route Planner</h1>
+                <span class="brand-sub">dispatch &amp; balancing console</span>
+            </div>
         </div>
         <div class="header-controls">
             <button id="help-btn" class="btn btn-ghost btn-sm">
                 <svg class="icon" aria-hidden="true"><use href="#icon-help"/></svg>
                 <span data-i18n="help_btn">Bantuan</span>
             </button>
-            <button id="lang-toggle" class="btn btn-ghost btn-sm" title="Language"></button>
+            <div id="lang-picker" class="lang-picker">
+                <button id="lang-toggle" class="btn btn-ghost btn-sm" aria-haspopup="listbox" aria-expanded="false" title="Language">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-globe"/></svg>
+                    <span id="lang-current-label"></span>
+                    <svg class="icon icon-chevron" aria-hidden="true"><use href="#icon-chevron-down"/></svg>
+                </button>
+                <div id="lang-menu" class="lang-menu hidden" role="listbox" data-i18n-tip="lang"></div>
+            </div>
         </div>
     </header>
 
@@ -36,11 +50,23 @@
                     <svg class="icon"><use href="#icon-chevron-down"/></svg>
                 </button>
             </div>
+
+            <!-- Signature: route-line progress -->
             <div id="steps" class="steps" role="group" aria-label="Progres pengaturan">
-                <button type="button" class="step" data-step="1"><span class="step-num">1</span><span data-i18n="step_points">Titik</span></button>
-                <button type="button" class="step" data-step="2"><span class="step-num">2</span><span data-i18n="step_depot">Mulai</span></button>
-                <button type="button" class="step" data-step="3"><span class="step-num">3</span><span data-i18n="step_vehicles">Kendaraan</span></button>
+                <button type="button" class="step" data-step="1">
+                    <span class="step-node"><span class="step-num">1</span></span>
+                    <span class="step-label" data-i18n="step_points">Titik</span>
+                </button>
+                <button type="button" class="step" data-step="2">
+                    <span class="step-node"><span class="step-num">2</span></span>
+                    <span class="step-label" data-i18n="step_depot">Mulai</span>
+                </button>
+                <button type="button" class="step" data-step="3">
+                    <span class="step-node"><span class="step-num">3</span></span>
+                    <span class="step-label" data-i18n="step_vehicles">Kendaraan</span>
+                </button>
             </div>
+
             <div class="tabs" role="tablist" aria-label="Navigasi">
                 <button class="tab active" data-tab="points" role="tab" aria-selected="true" data-i18n="tab_points">Titik</button>
                 <button class="tab" data-tab="settings" role="tab" aria-selected="false" data-i18n="tab_settings">Pengaturan</button>
@@ -57,12 +83,12 @@
                     <div id="search-results" class="search-results hidden" role="listbox"></div>
                 </div>
 
-                <div class="section-title" data-i18n="point_list">Daftar Titik</div>
+                <div class="section-title"><span class="tick">›</span><span data-i18n="point_list">Daftar Titik</span></div>
                 <div id="point-list" class="point-list">
                     <div class="empty-state" data-i18n="point_empty">Belum ada titik. Upload CSV atau cari alamat di atas.</div>
                 </div>
 
-                <div class="upload-box">
+                <div id="drop-zone" class="upload-box">
                     <label class="btn btn-secondary" for="csv-file"><svg class="icon" aria-hidden="true"><use href="#icon-upload"/></svg><span data-i18n="upload_csv">Upload CSV</span></label>
                     <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
                     <button id="export-btn" class="btn btn-secondary"><svg class="icon" aria-hidden="true"><use href="#icon-download"/></svg><span data-i18n="export_csv">Export CSV</span></button>
@@ -197,7 +223,7 @@
                 <div id="onboard-title" data-i18n="onboard_title">Selamat datang</div>
             </div>
             <div class="modal-body">
-                <p data-i18n="onboard_p1">Atur titik pengiriman & depot, lalu hitung rute otomatis untuk 1–50 kendaraan dengan pembagian beban kerja yang seimbang.</p>
+                <p data-i18n="onboard_p1">Atur titik pengiriman &amp; depot, lalu hitung rute otomatis untuk 1–50 kendaraan dengan pembagian beban kerja yang seimbang.</p>
                 <p data-i18n="onboard_p2">Titik bisa dicari, diklik di peta, ditempel sebagai koordinat, atau diupload via CSV.</p>
                 <p data-i18n="onboard_p3">Hasil per kendaraan siap disalin atau dikirim ke WhatsApp dari panel ringkasan.</p>
             </div>
@@ -213,7 +239,7 @@
         <div class="modal-backdrop"></div>
         <div class="modal-panel">
             <div class="modal-header">
-                <div id="help-title" data-i18n="help_title">Panduan & Fitur</div>
+                <div id="help-title" data-i18n="help_title">Panduan &amp; Fitur</div>
                 <button id="help-close" class="btn btn-ghost" aria-label="Tutup panduan"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></button>
             </div>
             <div class="modal-body">
@@ -230,7 +256,7 @@
                     <p data-i18n="h_depot_body"></p>
                 </div>
                 <div class="help-section">
-                    <h3 data-i18n="h_csv">4. Import & Export CSV</h3>
+                    <h3 data-i18n="h_csv">4. Import &amp; Export CSV</h3>
                     <p data-i18n="h_csv_body"></p>
                     <pre class="csv-sample">name, latitude, longitude
 Toko A, -8.540357, 115.322862
@@ -241,7 +267,7 @@ Toko B, -8.654217, 115.216231</pre>
                     <p data-i18n="h_modes_body"></p>
                 </div>
                 <div class="help-section">
-                    <h3 data-i18n="h_profile">6. Profil & garis jalan</h3>
+                    <h3 data-i18n="h_profile">6. Profil &amp; garis jalan</h3>
                     <p data-i18n="h_profile_body"></p>
                 </div>
                 <div class="help-section">
@@ -299,6 +325,7 @@ Toko B, -8.654217, 115.216231</pre>
             <symbol id="icon-locate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></symbol>
             <symbol id="icon-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
             <symbol id="icon-chevron-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></symbol>
+            <symbol id="icon-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
         </defs>
     </svg>
 
@@ -306,6 +333,14 @@ Toko B, -8.654217, 115.216231</pre>
     <script src="js/lang/en.js"></script>
     <script src="js/lang/id.js"></script>
     <script src="js/lang/es.js"></script>
+    <script src="js/lang/zh.js"></script>
+    <script src="js/lang/hi.js"></script>
+    <script src="js/lang/ar.js"></script>
+    <script src="js/lang/fr.js"></script>
+    <script src="js/lang/de.js"></script>
+    <script src="js/lang/pt.js"></script>
+    <script src="js/lang/ru.js"></script>
+    <script src="js/lang/ja.js"></script>
     <script src="js/i18n.js"></script>
     <script src="js/search-provider.js"></script>
     <script src="js/idb-cache.js"></script>
