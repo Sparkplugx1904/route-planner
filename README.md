@@ -2,6 +2,12 @@
 
 **Fair Workload Balancing** untuk pembagian rute multi-tim dengan keadilan beban kerja: tim dengan jarak jauh mendapat kunjungan sedikit, tim dengan jarak dekat mendapat kunjungan banyak.
 
+<p align="center">
+  <a href="https://sparkplugx1904.github.io/route-planner/?lang=en" target="_blank">
+    <img src="https://img.shields.io/badge/TRY IT NOW-orange?style=for-the-badge&&logoColor=white&color=FF5500" alt="Route Planner"/>
+  </a>
+</p>
+
 ## 🎯 Fitur Utama
 
 ### 1. **Workload Balancing (Keadilan Beban Kerja)**
