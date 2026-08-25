@@ -1,10 +1,13 @@
 /* sw.js — service worker: cache shell aplikasi agar tetap bisa dibuka offline */
-const CACHE = 'rp-shell-v2';
+const CACHE = 'rp-shell-v3';
 const SHELL = [
     './',
     './index.html',
     './manifest.json',
     './css/style.css',
+    './js/lang/en.js',
+    './js/lang/id.js',
+    './js/lang/es.js',
     './js/i18n.js',
     './js/search-provider.js',
     './js/idb-cache.js',

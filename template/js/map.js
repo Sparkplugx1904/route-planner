@@ -7,6 +7,7 @@ const RouteMap = (() => {
     let routeLayer = null;      // hasil rute per tim
     let depotMarker = null;
     let pointMarkers = [];      // [marker,...] sejajar index App.points
+    let dimTeamId = null;       // tim yang di-sorot (rute lain diredupkan), null = normal
 
     const TEAM_COLORS = [
         '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4',
@@ -14,6 +15,22 @@ const RouteMap = (() => {
         '#e6beff', '#a9a9a9', '#bfef45', '#fabed4', '#aaffc3', '#ffd8b1',
         '#dcbeff', '#000000'
     ];
+
+    const DIM_OPACITY = 0.3 * 0.85 / 0.85; // 30% dari opacity normal 0.85
+    function dimmed(op) { return +(op * 0.3).toFixed(3); }
+
+    function applyDim(layer, isDepotLayer) {
+        if (!layer.eachLayer) return;
+        layer.eachLayer(child => {
+            if (child.setOpacity) {
+                child.setOpacity(isDepotLayer || !dimTeamId ? child.options._baseOp ?? 1 : dimmed(child.options._baseOp ?? 1));
+            }
+            if (child.setStyle && child instanceof L.Path) {
+                const base = child.options._baseOp ?? 0.85;
+                child.setStyle({ opacity: isDepotLayer || !dimTeamId ? base : dimmed(base) });
+            }
+        });
+    }
 
     function init(centerLat, centerLon) {
         map = L.map('map').setView([centerLat, centerLon], 11);
@@ -95,6 +112,7 @@ const RouteMap = (() => {
         if (!map) return;
         routeLayer.clearLayers();
         pointLayer.clearLayers();
+        dimTeamId = null;
 
         const depot = allCoords[0];
         if (depotMarker) { depotMarker.remove(); depotMarker = null; }
@@ -152,6 +170,41 @@ const RouteMap = (() => {
                 }
             });
         });
+        // garis baru harus ikut status dim saat ini
+        refreshDim();
+    }
+
+    // Sorot satu tim: semua rute tim lain diredupkan ke ~30% opacity.
+    // Klik tim sama lagi (atau highlight(null)) -> kembali normal.
+    function highlightTeam(teamId) {
+        dimTeamId = (dimTeamId === teamId) ? null : teamId;
+        refreshDim();
+        return dimTeamId; // null berarti sekarang normal
+    }
+
+    function clearHighlight() {
+        dimTeamId = null;
+        refreshDim();
+    }
+
+    function refreshDim() {
+        if (!routeLayer) return;
+        routeLayer.eachLayer(layer => {
+            const data = layer._routeData;
+            if (!data) return;
+            const active = !dimTeamId || data.teamId === dimTeamId;
+            layer.eachLayer(child => {
+                if (child instanceof L.Path) {
+                    // polyline rute
+                    child.setStyle({ opacity: active ? 0.85 : 0.255 }); // 0.85 x 30%
+                } else if (child.setOpacity) {
+                    // divIcon marker bernomor
+                    child.setOpacity(active ? 1.0 : 0.3);
+                }
+            });
+        });
+        // depot selalu tampak penuh (titik start/finish bersama)
+        if (depotMarker && depotMarker.setOpacity) depotMarker.setOpacity(1.0);
     }
 
     function centerOn(lat, lon, zoom) {
@@ -178,7 +231,7 @@ const RouteMap = (() => {
         return segs;
     }
 
-    return { init, renderPoints, renderRoutes, setTeamLines, centerOn, highlightPoint, getMap, teamColor, straightLinesFor };
+    return { init, renderPoints, renderRoutes, setTeamLines, centerOn, highlightPoint, getMap, teamColor, straightLinesFor, highlightTeam, clearHighlight };
 })();
 
 function escapeHtml(s) {

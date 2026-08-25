@@ -230,9 +230,13 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Sego
     background: var(--marine); color: #fff; font-size: 10px; font-weight: 800; }
 .rt-detail-foot { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); color: var(--text); font-weight: 700; }
 
-.run-area { margin-top: auto; padding: 12px; border-top: 1px solid var(--border); background: var(--panel); }
+.run-area { margin-top: auto; padding: 12px 12px 29px; border-top: 1px solid var(--border); background: var(--panel); }
 
-.build-commit { text-align: center; font-size: var(--fs-mini); color: var(--muted); background: var(--panel); }
+/* Badge commit "mengambang" di reserve strip bawah run-area: margin-top negatif
+   membatalkan tinggi alirinya (11px font + 2×3px padding = 17px), jadi kemunculan
+   badge TIDAK menggeser tombol Hitung Rute sama sekali. Strip kosong saat hidden
+   hanya 29px padding bawah run-area. */
+.build-commit { text-align: center; font-size: var(--fs-mini); color: var(--muted); background: var(--panel); line-height: 1; padding: 3px 0; margin-top: -17px; }
 .build-commit a { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-decoration: none; letter-spacing: .03em; }
 .build-commit a:hover { color: var(--brand); text-decoration: underline; }
 

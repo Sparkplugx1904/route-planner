@@ -187,10 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
     applyLang();
     if (loadSession()) {
         applyLang();
-        $('lang-toggle').textContent = tl('switch_lang');
     }
-$('lang-toggle').addEventListener('click', toggleLang);
-    $('lang-toggle').textContent = tl('switch_lang');
+    updateLangButtonLabel();
+$('lang-toggle').addEventListener('click', cycleLang);
     window.rpApp = window.rpApp || {};
     window.rpApp.onLangChange = () => updateChecklist();
 

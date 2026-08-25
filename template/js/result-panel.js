@@ -139,6 +139,9 @@ const ResultPanel = (() => {
                     return;
                 }
                 if (e.target.closest('.badge')) return;
+                // Sorot rute tim ini di peta: tim lain diredupkan ke ~30%.
+                // Klik tim yang sama lagi -> semua rute kembali normal.
+                RouteMap.highlightTeam(tr.teamId);
                 const isOpen = expanded === tr.teamId;
                 expanded = isOpen ? -1 : tr.teamId;
                 wrapDiv.dataset.ti = tr.teamId;
@@ -193,6 +196,9 @@ const ResultPanel = (() => {
         el('results-stats').textContent = tl('route_downloaded');
     }
 
-    function hide() { el('results').classList.add('hide'); }
+    function hide() {
+        el('results').classList.add('hide');
+        if (RouteMap.clearHighlight) RouteMap.clearHighlight();
+    }
     return { show, hide };
 })();
