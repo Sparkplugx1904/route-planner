@@ -1,0 +1,22 @@
+# Build artifacts
+build/
+build-em/
+*.obj
+*.o
+*.exe
+
+# Runtime cache (OSRM distance matrix)
+.osrm_cache/
+
+# Generated output
+routes*.html
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Route Planner</title>
+    <meta name="description" content="Bagikan titik pengiriman ke beberapa kendaraan dengan beban kerja seimbang.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230F766E'/><g fill='none' stroke='%23FFFFFF' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'><rect x='17' y='28' width='46' height='36' rx='4'/><path d='M63 42h13l11 11v11H63z'/><circle cx='35' cy='72' r='5' fill='%23FFFFFF' stroke='none'/><circle cx='71' cy='72' r='5' fill='%23FFFFFF' stroke='none'/></g></svg>">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0F172A">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="offline-banner" class="offline-banner hidden"></div>
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#icon-truck"/></svg></span>
+            <h1>Route Planner</h1>
+        </div>
+        <div class="header-controls">
+            <button id="help-btn" class="btn btn-ghost btn-sm">
+                <svg class="icon" aria-hidden="true"><use href="#icon-help"/></svg>
+                <span data-i18n="help_btn">Bantuan</span>
+            </button>
+            <button id="lang-toggle" class="btn btn-ghost btn-sm" title="Language">ID | EN</button>
+        </div>
+    </header>
+
+    <main class="layout">
+        <!-- ================= SIDE PANEL ================= -->
+        <aside id="panel" class="panel" aria-label="Panel kendali">
+            <div id="panel-handle" class="panel-handle" aria-hidden="true">
+                <div class="grip"></div>
+                <button id="panel-toggle" class="toggle" aria-hidden="true" tabindex="-1">
+                    <svg class="icon"><use href="#icon-chevron-down"/></svg>
+                </button>
+            </div>
+            <div id="steps" class="steps" role="group" aria-label="Progres pengaturan">
+                <button type="button" class="step" data-step="1"><span class="step-num">1</span><span data-i18n="step_points">Titik</span></button>
+                <button type="button" class="step" data-step="2"><span class="step-num">2</span><span data-i18n="step_depot">Mulai</span></button>
+                <button type="button" class="step" data-step="3"><span class="step-num">3</span><span data-i18n="step_vehicles">Kendaraan</span></button>
+            </div>
+            <div class="tabs" role="tablist" aria-label="Navigasi">
+                <button class="tab active" data-tab="points" role="tab" aria-selected="true" data-i18n="tab_points">Titik</button>
+                <button class="tab" data-tab="settings" role="tab" aria-selected="false" data-i18n="tab_settings">Pengaturan</button>
+            </div>
+
+            <!-- Points tab -->
+            <section id="tab-points" class="tab-body active" role="tabpanel">
+                <div class="search-box">
+                    <div class="search-row">
+                        <input id="search-input" type="text" autocomplete="off"
+                               placeholder="Cari alamat/tempat…" data-i18n="search_placeholder" aria-label="Cari alamat">
+                        <button id="point-pick" class="btn btn-ghost" title="Pilih dari peta"><svg class="icon" aria-hidden="true"><use href="#icon-map-pin"/></svg><span data-i18n="point_pick">Cari di Peta</span></button>
+                    </div>
+                    <div id="search-results" class="search-results hidden" role="listbox"></div>
+                </div>
+
+                <div class="section-title" data-i18n="point_list">Daftar Titik</div>
+                <div id="point-list" class="point-list">
+                    <div class="empty-state" data-i18n="point_empty">Belum ada titik. Upload CSV atau cari alamat di atas.</div>
+                </div>
+
+                <div class="upload-box">
+                    <label class="btn btn-secondary" for="csv-file"><svg class="icon" aria-hidden="true"><use href="#icon-upload"/></svg><span data-i18n="upload_csv">Upload CSV</span></label>
+                    <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
+                    <button id="export-btn" class="btn btn-secondary"><svg class="icon" aria-hidden="true"><use href="#icon-download"/></svg><span data-i18n="export_csv">Export CSV</span></button>
+                    <button id="new-session-btn" class="btn btn-ghost" title="Mulai sesi baru" aria-label="Mulai sesi baru"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg><span data-i18n="new_session">Sesi Baru</span></button>
+                    <span id="csv-status" class="muted"></span>
+                </div>
+
+                <details id="paste-box" class="advanced-box">
+                    <summary id="paste-summary"><svg class="icon" aria-hidden="true"><use href="#icon-paste"/></svg><span data-i18n="paste_label">Tempel Banyak Titik (koordinat)</span></summary>
+                    <div class="advanced-inner">
+                        <textarea id="paste-input" rows="5" spellcheck="false" data-i18n-ph="paste_ph" aria-label="Tempel koordinat"></textarea>
+                        <div class="paste-actions">
+                            <button id="paste-example" class="btn btn-ghost btn-sm" data-i18n="paste_example">Contoh</button>
+                            <button id="paste-add" class="btn btn-secondary"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg><span data-i18n="paste_add">Tambah Semua</span></button>
+                        </div>
+                    </div>
+                </details>
+            </section>
+
+            <!-- Settings tab -->
+            <section id="tab-settings" class="tab-body" role="tabpanel">
+                <label class="field">
+                    <span data-i18n="depot_label">Titik Depot / Start</span>
+                    <div class="depot-row">
+                        <input id="depot-name" type="text" value="" placeholder="Nama depot…" data-i18n-ph="depot_name_ph">
+                        <button id="depot-pick" class="btn btn-ghost" title="Pilih dari peta"><svg class="icon" aria-hidden="true"><use href="#icon-locate"/></svg><span data-i18n="depot_pick">Pilih</span></button>
+                    </div>
+                </label>
+
+                <label class="field">
+                    <span data-i18n="depot_search">Cari lokasi depot</span>
+                    <div class="search-box">
+                        <input id="depot-search-input" type="text" autocomplete="off"
+                               placeholder="Cari alamat untuk depot…" data-i18n-ph="depot_search_ph" aria-label="Cari alamat depot">
+                        <div id="depot-search-results" class="search-results hidden" role="listbox"></div>
+                    </div>
+                </label>
+
+                <label class="field">
+                    <span data-i18n="teams_label">Berapa kendaraan?</span>
+                    <span class="field-tip" data-i18n="teams_hint">opsional — otomatis menyesuaikan jumlah titik</span>
+                    <div class="stepper">
+                        <button type="button" class="btn btn-sm" id="teams-minus" aria-label="kurang jumlah kendaraan">−</button>
+                        <input id="teams" type="number" min="1" max="50" value="1" inputmode="numeric" aria-label="Jumlah kendaraan">
+                        <button type="button" class="btn btn-sm" id="teams-plus" aria-label="tambah jumlah kendaraan">+</button>
+                    </div>
+                    <button id="teams-suggest" class="suggest-btn hidden"></button>
+                </label>
+
+                <details id="advanced" class="advanced-box">
+                    <summary id="advanced-summary"><svg class="icon" aria-hidden="true"><use href="#icon-gear"/></svg><span data-i18n="advanced_label">Lanjutan (opsional)</span></summary>
+                    <div class="advanced-inner">
+                        <label class="field">
+                            <span data-i18n="mode_label" title="">Mode Pembagian</span>
+                            <select id="mode" data-i18n-tip="mode_tip">
+                                <option value="0" data-i18n="mode_balanced">Balanced Workload</option>
+                                <option value="1" data-i18n="mode_nearest">Nearest Neighbor</option>
+                                <option value="2" data-i18n="mode_fuel">Fuel Efficient</option>
+                                <option value="3" data-i18n="mode_equal">Equal Distance</option>
+                                <option value="4" data-i18n="mode_compact">Compact Geographic</option>
+                                <option value="5" data-i18n="mode_balanced_dist">Balanced Distance</option>
+                            </select>
+                        </label>
+
+                        <label class="field">
+                            <span data-i18n="profile_label">Jenis perjalanan</span>
+                            <select id="profile" data-i18n-tip="profile_tip">
+                                <option value="driving" data-i18n="profile_driving">Driving (mobil)</option>
+                                <option value="bike" data-i18n="profile_bike">Bike (sepeda)</option>
+                                <option value="foot" data-i18n="profile_foot">Foot (jalan kaki)</option>
+                            </select>
+                        </label>
+
+                        <label class="field switch">
+                            <input id="road-lines" type="checkbox" checked>
+                            <span data-i18n="road_lines">Garis rute sepanjang jalan</span>
+                        </label>
+
+                        <label class="field">
+                            <span data-i18n="restarts_label">Restart clustering</span>
+                            <input id="restarts" type="number" min="1" max="50" value="10" data-i18n-tip="restarts_tip">
+                        </label>
+
+                        <label class="field">
+                            <span data-i18n="depot_location">Lokasi depot (koordinat)</span>
+                            <div class="coord-row">
+                                <input id="depot-lat" type="number" step="any" value="" placeholder="lat">
+                                <input id="depot-lon" type="number" step="any" value="" placeholder="lon">
+                            </div>
+                        </label>
+                    </div>
+                </details>
+            </section>
+
+            <div class="run-area">
+                <button id="run-btn" class="btn btn-primary"><svg class="icon" aria-hidden="true"><use href="#icon-play"/></svg><span data-i18n="run_btn">Hitung Rute</span></button>
+                <button id="cancel-btn" class="btn btn-danger hidden"><svg class="icon" aria-hidden="true"><use href="#icon-stop"/></svg><span data-i18n="cancel_run">Batal</span></button>
+                <div id="progress-wrap" class="progress-wrap hidden">
+                    <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+                    <div id="progress-text" class="progress-text"></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ================= MAP ================= -->
+        <div id="map" class="map"></div>
+
+        <!-- ================= RESULTS (mobile bottom sheet / desktop right drawer) ================= -->
+        <section id="results" class="results hidden hide">
+            <div class="results-header">
+                <div id="results-title" data-i18n="results_title">Ringkasan Rute</div>
+                <button id="results-close" class="btn btn-ghost" aria-label="Tutup ringkasan"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></button>
+            </div>
+            <div id="results-stats" class="results-stats"></div>
+            <div id="results-table" class="results-table"></div>
+        </section>
+    </main>
+
+    <!-- Loading overlay -->
+    <div id="loading" class="loading hidden">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#icon-truck"/></svg></span>
+        <div class="spinner"></div>
+        <div id="loading-text">Memuat…</div>
+    </div>
+
+    <!-- Onboarding (pertama kali) -->
+    <div id="onboard-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel onboard-panel">
+            <div class="modal-header">
+                <div id="onboard-title" data-i18n="onboard_title">Selamat datang</div>
+            </div>
+            <div class="modal-body">
+                <p data-i18n="onboard_p1">Atur titik pengiriman & depot, lalu hitung rute otomatis untuk 1–50 kendaraan dengan pembagian beban kerja yang seimbang.</p>
+                <p data-i18n="onboard_p2">Titik bisa dicari, diklik di peta, ditempel sebagai koordinat, atau diupload via CSV.</p>
+                <p data-i18n="onboard_p3">Hasil per kendaraan siap disalin atau dikirim ke WhatsApp dari panel ringkasan.</p>
+            </div>
+            <div class="dialog-actions">
+                <button id="onboard-sample" class="btn btn-secondary"><svg class="icon" aria-hidden="true"><use href="#icon-flask"/></svg><span data-i18n="onboard_sample">Muat Contoh Data</span></button>
+                <button id="onboard-start" class="btn btn-primary" data-i18n="onboard_start">Mulai</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help / tutorial modal -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-panel">
+            <div class="modal-header">
+                <div id="help-title" data-i18n="help_title">Panduan & Fitur</div>
+                <button id="help-close" class="btn btn-ghost" aria-label="Tutup panduan"><svg class="icon" aria-hidden="true"><use href="#icon-x"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3 data-i18n="h_start">1. Memulai dengan cepat</h3>
+                    <p data-i18n="h_start_body"></p>
+                </div>
+                <div class="help-section">
+                    <h3 data-i18n="h_points">2. Menambah titik</h3>
+                    <p data-i18n="h_points_body"></p>
+                </div>
+                <div class="help-section">
+                    <h3 data-i18n="h_depot">3. Atur depot / start</h3>
+                    <p data-i18n="h_depot_body"></p>
+                </div>
+                <div class="help-section">
+                    <h3 data-i18n="h_csv">4. Import & Export CSV</h3>
+                    <p data-i18n="h_csv_body"></p>
+                    <pre class="csv-sample">name, latitude, longitude
+Toko A, -8.540357, 115.322862
+Toko B, -8.654217, 115.216231</pre>
+                </div>
+                <div class="help-section">
+                    <h3 data-i18n="h_modes">5. Mode routing (advanced)</h3>
+                    <p data-i18n="h_modes_body"></p>
+                </div>
+                <div class="help-section">
+                    <h3 data-i18n="h_profile">6. Profil & garis jalan</h3>
+                    <p data-i18n="h_profile_body"></p>
+                </div>
+                <div class="help-section">
+                    <h3 data-i18n="h_settings">7. Pengaturan lainnya</h3>
+                    <p data-i18n="h_settings_body"></p>
+                </div>
+                <div class="help-section">
+                    <h3 data-i18n="h_results">8. Membaca hasil</h3>
+                    <p data-i18n="h_results_body"></p>
+                </div>
+                <div class="help-section">
+                    <h3 data-i18n="h_tech">9. Catatan teknis</h3>
+                    <p data-i18n="h_tech_body"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialog in-page (pengganti alert/confirm browser) -->
+    <div id="dialog-modal" class="modal hidden">
+        <div id="dialog-backdrop" class="modal-backdrop"></div>
+        <div class="modal-panel dialog-panel">
+            <div class="modal-header">
+                <div id="dialog-title"></div>
+            </div>
+            <div class="modal-body">
+                <div id="dialog-msg" class="dialog-msg"></div>
+            </div>
+            <div class="dialog-actions">
+                <button id="dialog-cancel" class="btn btn-ghost hidden"></button>
+                <button id="dialog-ok" class="btn btn-primary"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spritesheet ikon (inline, offline-friendly) -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+        <defs>
+            <symbol id="icon-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="18.5" cy="18.5" r="2"/></symbol>
+            <symbol id="icon-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+            <symbol id="icon-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+            <symbol id="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+            <symbol id="icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+            <symbol id="icon-paste" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></symbol>
+            <symbol id="icon-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+            <symbol id="icon-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+            <symbol id="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21"/></symbol>
+            <symbol id="icon-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+            <symbol id="icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+            <symbol id="icon-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+            <symbol id="icon-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+            <symbol id="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+            <symbol id="icon-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></symbol>
+            <symbol id="icon-flask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6l-5.5 9.5a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9V3"/><line x1="7.5" y1="15" x2="16.5" y2="15"/></symbol>
+            <symbol id="icon-locate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></symbol>
+            <symbol id="icon-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+            <symbol id="icon-chevron-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></symbol>
+        </defs>
+    </svg>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/search-provider.js"></script>
+    <script src="js/idb-cache.js"></script>
+    <script src="js/osrm.js"></script>
+    <script src="js/upload.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/result-panel.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
