@@ -144,7 +144,8 @@ bool OSRMClient::fetch_chunk(const std::vector<Coord>& all_coords,
                              const std::vector<int>& source_indices,
                              const std::string& profile,
                              int timeout_seconds,
-                             std::vector<std::vector<double>>& result) {
+                             std::vector<std::vector<double>>& result,
+                             bool& used_fallback) {
     try {
         // Build coordinates string: "lon1,lat1;lon2,lat2;..."
         std::ostringstream coords_str;
@@ -170,6 +171,7 @@ bool OSRMClient::fetch_chunk(const std::vector<Coord>& all_coords,
         if (!response.has_value()) {
             // Fallback to haversine
             std::cerr << "[Warning] OSRM fetch failed, using haversine fallback" << std::endl;
+            used_fallback = true;
             size_t n = all_coords.size();
             result.resize(source_indices.size(), std::vector<double>(n));
             
@@ -252,19 +254,31 @@ std::optional<Matrix> OSRMClient::fetch_matrix(const std::vector<Coord>& coords,
     }
     
     // Fetch chunks (could be parallelized)
+    bool any_fallback = false;
     for (const auto& chunk : chunks) {
         std::vector<std::vector<double>> chunk_result;
-        if (!fetch_chunk(coords, chunk, profile, timeout_seconds, chunk_result)) {
+        bool chunk_fallback = false;
+        if (!fetch_chunk(coords, chunk, profile, timeout_seconds, chunk_result, chunk_fallback)) {
             std::cerr << "[Error] Failed to fetch chunk" << std::endl;
             return std::nullopt;
         }
-        
+        if (chunk_fallback) {
+            any_fallback = true;
+        }
+
         // Copy chunk result to matrix
         for (size_t i = 0; i < chunk.size(); ++i) {
             matrix[chunk[i]] = chunk_result[i];
         }
     }
-    
+
+    // Jangan persist matrix yang mengandung baris fallback haversine —
+    // agar run berikutnya tidak memakai estimasi yang dikira jarak asli.
+    if (any_fallback) {
+        std::cerr << "[Warning] Matrix contains haversine fallback rows; not caching" << std::endl;
+        return matrix;
+    }
+
     // Save to cache
     save_to_cache(cache_key, matrix);
     

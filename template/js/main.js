@@ -221,7 +221,8 @@ setupSteps();
     setupOnboarding();
     setupOffline();
     setupPanelCollapse();
-    if ('serviceWorker' in navigator && location.protocol === 'http:' || location.protocol === 'https:') {
+    setupBuildInfo();
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
         navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW:', err));
     }
     UiDialog.setup();
@@ -586,6 +587,39 @@ function setupOffline() {
     window.addEventListener('online', updater);
     window.addEventListener('offline', updater);
     updater();
+}
+
+// ---------- Badge commit build (fetch GitHub API, cache 30 menit) ----------
+async function setupBuildInfo() {
+    const el = $('build-commit');
+    if (!el) return;
+    const CACHE_KEY = 'rp_commit_sha';
+    const TTL = 30 * 60 * 1000;
+
+    function render(sha) {
+        el.innerHTML = '';
+        const a = document.createElement('a');
+        a.href = 'https://github.com/Sparkplugx1904/route-planner/commit/' + sha;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = 'build ' + sha.slice(0, 7);
+        el.appendChild(a);
+        el.classList.remove('hidden');
+    }
+
+    try {
+        const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+        if (cached && cached.sha && Date.now() - cached.t < TTL) {
+            render(cached.sha);
+            return;
+        }
+        const res = await fetch('https://api.github.com/repos/Sparkplugx1904/route-planner/commits/main');
+        if (!res.ok) return;
+        const j = await res.json();
+        if (!j || !j.sha) return;
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), sha: j.sha })); } catch (e) { }
+        render(j.sha);
+    } catch (e) { /* offline / rate-limit — biarkan tersembunyi */ }
 }
 
 // ---------- Onboarding + contoh data ----------

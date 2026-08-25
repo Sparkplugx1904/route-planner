@@ -86,7 +86,7 @@ const OSRM = (() => {
     // Matrix lengkap dengan cache + fallback haversine (dari WASM).
     // returns {matrix: Float64Array, source: 'cache'|'osrm'|'haversine', failed?: bool}
     async function getMatrix(coords, profile, progressCb) {
-        const key = matrixCacheKey(coords, profile);
+        const key = await matrixCacheKey(coords, profile);
         const cached = await IDBCache.get(key);
         if (cached) {
             if (progressCb) progressCb(coords.length, coords.length);
@@ -113,7 +113,7 @@ const arr = new Float64Array(n * 2);
 
     // Polyline per segmen dengan cache; null artinya pakai garis lurus.
     async function getGeometryCached(from, to, profile) {
-        const key = polylineCacheKey(from, to, profile);
+        const key = await polylineCacheKey(from, to, profile);
         const cached = await IDBCache.get(key);
         if (cached !== undefined) return cached;
         try {

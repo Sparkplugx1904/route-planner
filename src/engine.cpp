@@ -67,8 +67,10 @@ EngineResult compute_routes(const std::vector<Coord>& all_coords,
                             int num_restarts,
                             EngineProgress progress) {
     EngineResult result;
-    
+
     int n_locations = static_cast<int>(all_coords.size()) - 1;
+
+    TSPSolver::clear_cache();
     
     // Extract location coordinates and submatrix
     std::vector<Coord> location_coords(all_coords.begin() + 1, all_coords.end());

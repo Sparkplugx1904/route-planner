@@ -232,6 +232,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Sego
 
 .run-area { margin-top: auto; padding: 12px; border-top: 1px solid var(--border); background: var(--panel); }
 
+.build-commit { text-align: center; font-size: var(--fs-mini); color: var(--muted); background: var(--panel); }
+.build-commit a { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-decoration: none; letter-spacing: .03em; }
+.build-commit a:hover { color: var(--brand); text-decoration: underline; }
+
 /* ---------- Progress ---------- */
 .progress-wrap { margin-top: 10px; }
 .progress-bar { height: 8px; background: var(--surface); border-radius: 4px; overflow: hidden; }

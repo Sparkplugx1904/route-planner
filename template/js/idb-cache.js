@@ -7,7 +7,7 @@
 
 const IDBCache = (() => {
     const DB_NAME = 'route-planner-cache';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
     const STORE = 'osrm-cache';
 
     let dbPromise = null;
@@ -20,6 +20,8 @@ const IDBCache = (() => {
             req.onupgradeneeded = () => {
                 if (!req.result.objectStoreNames.contains(STORE)) {
                     req.result.createObjectStore(STORE);
+                } else {
+                    req.transaction.objectStore(STORE).clear();
                 }
             };
             req.onsuccess = () => resolve(req.result);
@@ -65,11 +67,22 @@ function fnv1a(str) {
     return hash.toString(16).padStart(8, '0');
 }
 
-// Key untuk matrix: koordinat berurutan (depot pertama).
-function matrixCacheKey(coords, profile) {
-    return 'matrix|' + fnv1a(coords.map(c => c.lat.toFixed(6) + ',' + c.lon.toFixed(6)).join(';') + '|' + profile);
+// Hash kuat: SHA-256 (secure context). Fallback: FNV-1a ganda (64-bit ekuivalen).
+async function hashHex(str) {
+    if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+        try {
+            const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+            return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) { /* fallback di bawah */ }
+    }
+    return fnv1a(str + '|a') + fnv1a(str + '|b');
 }
 
-function polylineCacheKey(from, to, profile) {
-    return 'poly|' + fnv1a(from.lat.toFixed(6) + ',' + from.lon.toFixed(6) + '>' + to.lat.toFixed(6) + ',' + to.lon.toFixed(6) + '|' + profile);
+// Key untuk matrix: koordinat berurutan (depot pertama).
+async function matrixCacheKey(coords, profile) {
+    return 'matrix|' + await hashHex(coords.map(c => c.lat.toFixed(6) + ',' + c.lon.toFixed(6)).join(';') + '|' + profile);
+}
+
+async function polylineCacheKey(from, to, profile) {
+    return 'poly|' + await hashHex(from.lat.toFixed(6) + ',' + from.lon.toFixed(6) + '>' + to.lat.toFixed(6) + ',' + to.lon.toFixed(6) + '|' + profile);
 }

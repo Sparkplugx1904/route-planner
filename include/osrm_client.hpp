@@ -37,12 +37,14 @@ private:
     // HTTP utilities (simplified, will use httplib in actual implementation)
     std::optional<std::string> http_get(const std::string& url, int timeout_seconds);
     
-    // Fetch a single chunk of the distance matrix
+    // Fetch a single chunk of the distance matrix.
+    // used_fallback diset true bila chunk gagal dan diisi haversine (tidak boleh dipersist).
     bool fetch_chunk(const std::vector<Coord>& all_coords,
                     const std::vector<int>& source_indices,
                     const std::string& profile,
                     int timeout_seconds,
-                    std::vector<std::vector<double>>& result);
+                    std::vector<std::vector<double>>& result,
+                    bool& used_fallback);
 };
 
 } // namespace RoutePlanner

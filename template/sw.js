@@ -1,5 +1,5 @@
 /* sw.js — service worker: cache shell aplikasi agar tetap bisa dibuka offline */
-const CACHE = 'rp-shell-v1';
+const CACHE = 'rp-shell-v2';
 const SHELL = [
     './',
     './index.html',

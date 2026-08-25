@@ -1,15 +1,19 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+# Build WASM dari source C++ lalu deploy aplikasi web statis ke GitHub Pages.
+# Artefak route_planner_wasm.js/.wasm di-build ulang setiap push sehingga
+# deployment selalu sinkron dengan kode terbaru (tanpa build manual lokal).
+name: Build WASM & Deploy to Pages
 
 on:
-  # Runs on pushes targeting the default branch
+  # Runs on pushes targeting the default branch (dokumen tidak memicu build)
   push:
     branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
@@ -22,7 +26,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
@@ -31,13 +34,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Build WASM from C++ sources
+        run: |
+          emcc --version
+          emcmake cmake -S template/wasm -B template/wasm/build-ci -DCMAKE_BUILD_TYPE=Release
+          cmake --build template/wasm/build-ci --parallel
+          ls -la template/wasm/route_planner_wasm.js template/wasm/route_planner_wasm.wasm
+
+      # POST_BUILD di template/wasm/CMakeLists.txt otomatis menyalin artefak
+      # hasil build ke template/wasm/, sehingga yang di-upload sudah segar.
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload hanya folder template (aplikasi web statis)
           path: 'template'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
